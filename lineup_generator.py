@@ -37,14 +37,19 @@ def main():
         default=4,
         help="The number of lines per half.",
     )
+    parser.add_argument(
+        "--run_id",
+        default=None,
+        help="The identifier for the run.",
+    )
     args = parser.parse_args()
 
     if args.mode == "fairness":
         print("Running in fairness mode...")
-        generate_lineups_fairness(args.roster, args.num_halfs, args.lines_per_half)
+        generate_lineups_fairness(args.roster, args.num_halfs, args.lines_per_half, args.run_id)
     elif args.mode == "multi-objective":
         print("Running in multi-objective mode...")
-        generate_lineups_multi_objective(args.roster, args.num_halfs, args.lines_per_half)
+        generate_lineups_multi_objective(args.roster, args.num_halfs, args.lines_per_half, args.run_id)
 
 if __name__ == "__main__":
     main()

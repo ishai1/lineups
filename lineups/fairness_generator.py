@@ -8,15 +8,29 @@ This script generates a soccer lineup schedule based on player attributes and co
 
 import pandas as pd
 from pulp import LpProblem, LpVariable, lpSum, LpMaximize, LpStatus, LpMinimize
+import os
+import logging
+from datetime import datetime
 
-def generate_lineups(roster_file, num_halfs=2, lines_per_half=4):
+def generate_lineups(roster_file, num_halfs=2, lines_per_half=4, run_id=None):
     """_summary_
 
     Args:
         roster_file (_type_): _description_
         num_halfs (int, optional): _description_. Defaults to 2.
         lines_per_half (int, optional): _description_. Defaults to 4.
+        run_id (str, optional): _description_. Defaults to None.
     """
+    if run_id is None:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    output_dir = f"results/{run_id}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_file = os.path.join(output_dir, "run.log")
+    logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+    logger = logging.getLogger()
+    
     # 1. Data Loading and Preprocessing
     positions = ['G', 'LD', 'CD', 'RD', 'S', 'LC', 'RC', 'FC']
     defense_positions = ['LD', 'CD', 'RD']
@@ -111,20 +125,47 @@ def generate_lineups(roster_file, num_halfs=2, lines_per_half=4):
             for p in players:
                 model += plays_in_line[p][l]['G'] == plays_in_line[p][first_line_in_half]['G']
 
+    # Consistent Position per Half
+    for p in players:
+        for h in range(num_halfs):
+            lines_in_half = range(h * lines_per_half, (h + 1) * lines_per_half)
+            for pos in positions:
+                for l1 in lines_in_half:
+                    for l2 in lines_in_half:
+                        if l1 != l2:
+                            model += plays_in_line[p][l1][pos] >= plays_in_line[p][l2][pos]
+
 
     # 3. Solving and Output
+    model.writeLP(os.path.join(output_dir, "lineup_model.lp"))
     model.solve()
 
     if LpStatus[model.status] == 'Optimal':
-        print("Optimal lineup schedule found:")
+        logger.info("Optimal lineup schedule found:")
+        lineups = []
         for l in lines:
-            print(f"\nLine {l + 1}:")
+            line = {}
+            logger.info(f"\nLine {l + 1}:")
             for pos in positions:
                 for p in players:
                     if plays_in_line[p][l][pos].varValue == 1:
-                        print(f"  {pos}: {p}")
+                        logger.info(f"  {pos}: {p}")
+                        line[pos] = p
+            lineups.append(line)
+        
+        # Generate line changes
+        with open(os.path.join(output_dir, "line_changes.txt"), "w") as f:
+            for i in range(1, len(lineups)):
+                f.write(f"Line change from {i} to {i+1}:\n")
+                prev_line = set(lineups[i-1].values())
+                curr_line = set(lineups[i].values())
+                players_out = prev_line - curr_line
+                players_in = curr_line - prev_line
+                f.write(f"  Out: {', '.join(players_out)}\n")
+                f.write(f"  In: {', '.join(players_in)}\n\n")
+
     else:
-        print("No optimal solution found.")
+        logger.info("No optimal solution found.")
 
 if __name__ == "__main__":
     roster = "roster.csv"

@@ -9,11 +9,24 @@ This script generates a soccer lineup schedule by first optimizing for fairness
 
 import pandas as pd
 from pulp import LpProblem, LpVariable, lpSum, LpMaximize, LpStatus, LpMinimize, value
+import os
+import logging
+from datetime import datetime
 
-def generate_lineups_multi_objective(roster_file, num_halfs=2, lines_per_half=4):
+def generate_lineups_multi_objective(roster_file, num_halfs=2, lines_per_half=4, run_id=None):
     """
     Generates lineups using a two-step multi-objective optimization approach.
     """
+    if run_id is None:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    output_dir = f"results/{run_id}"
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_file = os.path.join(output_dir, "run.log")
+    logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+    logger = logging.getLogger()
+
     # --- Step 1: Optimize for Fairness ---
 
     # 1.1 Data Loading and Preprocessing
@@ -91,15 +104,32 @@ def generate_lineups_multi_objective(roster_file, num_halfs=2, lines_per_half=4)
             for p in players:
                 model_fairness += plays_in_line[p][l]['G'] == plays_in_line[p][first_line_in_half]['G']
 
+    # Consistent Position per Half
+    for p in players:
+        for h in range(num_halfs):
+            lines_in_half = range(h * lines_per_half, (h + 1) * lines_per_half)
+            for pos in positions:
+                for l1 in lines_in_half:
+                    for l2 in lines_in_half:
+                        if l1 != l2:
+                            model_fairness += plays_in_line[p][l1][pos] >= plays_in_line[p][l2][pos]
+
+    # All players play each half
+    for p in players:
+        for h in range(num_halfs):
+            lines_in_half = range(h * lines_per_half, (h + 1) * lines_per_half)
+            model_fairness += lpSum(plays_in_line[p][l][pos] for l in lines_in_half for pos in positions) >= 1
+
     # 1.3 Solve for Fairness
+    model_fairness.writeLP(os.path.join(output_dir, "lineup_model_fairness.lp"))
     model_fairness.solve()
 
     if LpStatus[model_fairness.status] != 'Optimal':
-        print("Could not find an optimal solution for fairness.")
+        logger.error("Could not find an optimal solution for fairness.")
         return
 
     optimal_fairness_diff = value(max_lines) - value(min_lines)
-    print(f"Optimal fairness difference found: {optimal_fairness_diff}")
+    logger.info(f"Optimal fairness difference found: {optimal_fairness_diff}")
 
     # --- Step 2: Optimize for Quality, Constrained by Fairness ---
 
@@ -130,8 +160,8 @@ def generate_lineups_multi_objective(roster_file, num_halfs=2, lines_per_half=4)
                 model_quality += plays_in_line[p][l]['G'] == 0
     for l in lines:
         model_quality += lpSum(defense_quality[p] * plays_in_line[p][l][pos] for p in players for pos in defense_positions) >= 7
-    for l in lines:
-        model_quality += lpSum(offense_quality[p] * plays_in_line[p][l][pos] for p in players for pos in offense_positions) >= 6
+    # for l in lines:
+    #     model_quality += lpSum(offense_quality[p] * plays_in_line[p][l][pos] for p in players for pos in offense_positions) >= 6
     for l in lines:
         model_quality += lpSum((defense_quality[p] + offense_quality[p] + striker_quality[p]) * plays_in_line[p][l][pos] for p in players for pos in positions) >= 17
     for l in lines:
@@ -155,20 +185,47 @@ def generate_lineups_multi_objective(roster_file, num_halfs=2, lines_per_half=4)
             for p in players:
                 model_quality += plays_in_line[p][l]['G'] == plays_in_line[p][first_line_in_half]['G']
 
+    # Consistent Position per Half
+    for p in players:
+        for h in range(num_halfs):
+            lines_in_half = range(h * lines_per_half, (h + 1) * lines_per_half)
+            for pos in positions:
+                for l1 in lines_in_half:
+                    for l2 in lines_in_half:
+                        if l1 != l2:
+                            model_quality += plays_in_line[p][l1][pos] >= plays_in_line[p][l2][pos]
+
+
     # 2.2 Solve for Quality
+    model_quality.writeLP(os.path.join(output_dir, "lineup_model_quality.lp"))
     model_quality.solve()
 
     # 3. Output
     if LpStatus[model_quality.status] == 'Optimal':
-        print("Optimal lineup schedule found (multi-objective):")
+        logger.info("Optimal lineup schedule found (multi-objective):")
+        lineups = []
         for l in lines:
-            print(f"\nLine {l + 1}:")
+            line = {}
+            logger.info(f"\nLine {l + 1}:")
             for pos in positions:
                 for p in players:
                     if plays_in_line[p][l][pos].varValue == 1:
-                        print(f"  {pos}: {p}")
+                        logger.info(f"  {pos}: {p}")
+                        line[pos] = p
+            lineups.append(line)
+
+        # Generate line changes
+        with open(os.path.join(output_dir, "line_changes.txt"), "w") as f:
+            for i in range(1, len(lineups)):
+                f.write(f"Line change from {i} to {i+1}:\n")
+                prev_line = set(lineups[i-1].values())
+                curr_line = set(lineups[i].values())
+                players_out = prev_line - curr_line
+                players_in = curr_line - prev_line
+                f.write(f"  Out: {', '.join(players_out)}\n")
+                f.write(f"  In: {', '.join(players_in)}\n\n")
     else:
-        print("No optimal solution found for the quality objective.")
+        logger.info("No optimal solution found for the quality objective.")
 
 if __name__ == "__main__":
     roster = "roster.csv"

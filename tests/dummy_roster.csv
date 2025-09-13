@@ -1,0 +1,15 @@
+Number,Player,Positions,Defense Quality,Offense Quality,Striker Quality,Goalie,Footedness
+1,"Player A","G",H,H,H,Y,R
+2,"Player B","LD",H,H,H,N,L
+3,"Player C","CD",H,H,H,N,R
+4,"Player D","RD",H,H,H,N,R
+5,"Player E","S",H,H,H,N,R
+6,"Player F","LC",H,H,H,N,L
+7,"Player G","RC",H,H,H,N,R
+8,"Player H","FC",H,H,H,N,R
+9,"Player I","S",L,L,L,N,R
+10,"Player J","G",L,L,L,Y,R
+11,"Player K","S",L,L,L,N,R
+12,"Player L","S",L,L,L,N,R
+13,"Player M","S",L,L,L,N,R
+14,"Player N","S",L,L,L,N,R

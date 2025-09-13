@@ -1,0 +1,63 @@
+#+TITLE: Soccer Lineup Generator
+
+A Python-based tool for generating optimal soccer lineups based on player attributes and constraints.
+
+* Features
+- Generates multiple lineup combinations for a given roster.
+- Offers two optimization modes:
+  - *Fairness*: Prioritizes equal playing time for all players.
+  - *Multi-Objective*: Maximizes fairness first, then maximizes total lineup quality.
+- Optimizes lineups based on player quality scores (Defense, Offense, Striker).
+- Enforces constraints such as minimum quality scores for defense, offense, and the total line.
+- Supports footedness constraints to ensure players are in appropriate positions.
+- Allows for customizable game parameters (number of halves, lines per half).
+
+* Installation
+1.  Clone the repository:
+    #+begin_src sh
+    git clone <repository-url>
+    #+end_src
+2.  Install the dependencies using Poetry:
+    #+begin_src sh
+    poetry install
+    #+end_src
+
+* Usage
+The script is run from the command line and accepts several arguments.
+
+**Basic Usage**
+To generate a lineup schedule, run the `lineup_generator.py` script. You can specify the optimization mode using the `--mode` flag.
+
+- To run in *fairness* mode (default):
+  #+begin_src sh
+  poetry run python lineup_generator.py --mode fairness
+  #+end_src
+
+- To run in *multi-objective* mode:
+  #+begin_src sh
+  poetry run python lineup_generator.py --mode multi-objective
+  #+end_src
+
+**All Options**
+#+begin_src sh
+usage: lineup_generator.py [-h] [--mode {fairness,multi-objective}] [--roster ROSTER] [--num_halfs NUM_HALFS] [--lines_per_half LINES_PER_HALF]
+
+Soccer Lineup Generator
+
+options:
+  -h, --help            show this help message and exit
+  --mode {fairness,multi-objective}
+                        The optimization mode to use.
+  --roster ROSTER       The path to the roster file.
+  --num_halfs NUM_HALFS
+                        The number of halves to schedule.
+  --lines_per_half LINES_PER_HALF
+                        The number of lines per half.
+#+end_src
+
+* Testing
+To run the tests, use the following command:
+#+begin_src sh
+poetry run pytest
+#+end_src
+
